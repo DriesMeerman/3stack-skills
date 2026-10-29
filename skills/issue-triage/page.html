@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Issue triage</title>
+<style>
+:root {
+  --bg: #f6f5f2; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6a66; --line: #dcdad4;
+  --accent: #2f5d50; --accent-soft: #e3eee9; --warn: #9a4b16; --warn-soft: #f6e9df; --code: #f0efea;
+  --ready: #2f6b3a; --decide: #8a5a00; --split: #44559a; --close: #8a3b3b; --priority: #6a3f8a; --keep: #6b6a66;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161716; --panel: #1f201f; --text: #e9e8e3; --muted: #9b9a95; --line: #343532;
+    --accent: #7fbfa8; --accent-soft: #23332d; --warn: #e2a06e; --warn-soft: #3a2a1f; --code: #262725;
+    --ready: #86c793; --decide: #e2b45c; --split: #9aaae8; --close: #e39494; --priority: #c49be0; --keep: #9b9a95;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161716; --panel: #1f201f; --text: #e9e8e3; --muted: #9b9a95; --line: #343532;
+  --accent: #7fbfa8; --accent-soft: #23332d; --warn: #e2a06e; --warn-soft: #3a2a1f; --code: #262725;
+  --ready: #86c793; --decide: #e2b45c; --split: #9aaae8; --close: #e39494; --priority: #c49be0; --keep: #9b9a95;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+main { max-width: 880px; margin: 0 auto; padding: 24px 16px 80px; }
+header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+h1 { font-size: 22px; margin: 0; }
+.meta { color: var(--muted); font-size: 13px; }
+.intro { color: var(--muted); margin: 8px 0 0; white-space: pre-wrap; }
+.toolbar { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 10px 0;
+  border-bottom: 1px solid var(--line); margin: 12px 0 20px; display: grid; gap: 8px; }
+.progress { display: flex; gap: 12px; align-items: center; }
+.bar { flex: 1; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.bar > div { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+.filters { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.chip { font: inherit; font-size: 13px; padding: 3px 10px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--text); cursor: pointer; }
+.chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.spacer { flex: 1; }
+.item { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+.item[hidden] { display: none; }
+.item h2 { font-size: 17px; margin: 0 0 6px; }
+.item h2 a { color: inherit; text-decoration: none; }
+.item h2 a:hover { text-decoration: underline; }
+.tag { display: inline-block; font-size: 12px; padding: 1px 7px; border-radius: 9px; background: var(--code); color: var(--muted); margin: 0 6px 4px 0; }
+.verdict { font-weight: 600; color: var(--panel); }
+.v-ready { background: var(--ready); } .v-decide { background: var(--decide); } .v-split { background: var(--split); }
+.v-close { background: var(--close); } .v-priority { background: var(--priority); } .v-keep { background: var(--keep); }
+.summary { margin: 6px 0 0; }
+.why { color: var(--muted); margin: 4px 0 0; font-size: 14px; white-space: pre-wrap; }
+.section-head { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 6px; }
+.action { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: start; }
+.action.accepted { border-color: var(--accent); background: var(--accent-soft); }
+.action.rejected { opacity: .65; }
+.action .a-title { font-weight: 600; }
+.action .detail { color: var(--muted); font-size: 13px; grid-column: 1 / -1; }
+.action details { grid-column: 1 / -1; font-size: 13px; }
+.action summary { cursor: pointer; color: var(--muted); }
+.seg { display: inline-flex; justify-self: start; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg label { padding: 4px 10px; font-size: 13px; cursor: pointer; background: var(--panel); }
+.seg label + label { border-left: 1px solid var(--line); }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { background: var(--accent); color: var(--panel); }
+.seg label.no:has(input:checked) { background: var(--muted); }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+pre { background: var(--code); border-radius: 6px; padding: 10px 12px; overflow-x: auto; white-space: pre-wrap;
+  word-break: break-word; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 6px 0; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code); padding: 1px 4px; border-radius: 4px; }
+.q { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 12px; }
+.q-head { font-weight: 600; margin-bottom: 4px; }
+.q-context { color: var(--muted); font-size: 14px; margin-bottom: 10px; white-space: pre-wrap; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.card { position: relative; border: 1.5px solid var(--line); border-radius: 8px; padding: 12px; cursor: pointer; background: var(--panel); }
+.card:hover { border-color: var(--accent); }
+.card input { position: absolute; opacity: 0; pointer-events: none; }
+.card:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.card:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card .label { font-weight: 600; display: block; }
+.card .detail, .radios .detail { color: var(--muted); font-size: 13px; display: block; margin-top: 2px; }
+.radios label { display: flex; gap: 10px; align-items: flex-start; padding: 7px 4px; cursor: pointer; border-radius: 6px; }
+.radios label:hover { background: var(--code); }
+.radios input { margin-top: 4px; accent-color: var(--accent); }
+.rec { font-size: 11px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; margin-left: 6px; }
+.fyi { font-size: 11px; font-weight: 600; color: var(--warn); text-transform: uppercase; letter-spacing: .04em; margin-left: 6px; }
+.steps { margin: 6px 0; padding-left: 20px; }
+.steps li { margin-bottom: 6px; }
+.steps .where { color: var(--muted); font-size: 13px; }
+textarea, input[type=text] { width: 100%; font: inherit; color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+textarea { min-height: 64px; resize: vertical; }
+textarea:focus, input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+.note { margin-top: 8px; }
+.checks { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; }
+.check { font-size: 13px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.reply { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+.reply h2 { font-size: 17px; margin: 0 0 6px; }
+button { font: inherit; padding: 8px 16px; border-radius: 6px; border: 0; background: var(--accent); color: var(--panel); cursor: pointer; font-weight: 600; }
+button.secondary { background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 400; }
+button.small { padding: 3px 10px; font-size: 13px; }
+.actions-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.copied { color: var(--accent); font-size: 13px; }
+.missing { color: var(--warn); font-size: 13px; }
+@media (max-width: 560px) {
+  .action { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="title">Issue triage</h1>
+    <span class="meta" id="meta"></span>
+  </header>
+  <p class="intro" id="intro" hidden></p>
+  <div class="toolbar">
+    <div class="progress"><span id="count" class="meta"></span><div class="bar"><div id="fill"></div></div></div>
+    <div class="filters" id="filters">
+      <span class="spacer"></span>
+      <button id="accept-rec" class="secondary small" type="button">Accept all recommended</button>
+    </div>
+  </div>
+  <div id="items"></div>
+  <section class="reply">
+    <h2>Notes for the whole batch</h2>
+    <textarea id="overall" placeholder="Anything that applies to every issue, or what to look at next (optional)"></textarea>
+  </section>
+  <section class="reply" style="margin-top:18px">
+    <h2>Reply for the agent</h2>
+    <p class="meta">Copy this and paste it into the agent session. It updates as you answer.
+      Nothing changes on GitHub until you approve the plan the agent shows you.</p>
+    <pre id="reply"></pre>
+    <div class="actions-row">
+      <button id="copy" type="button">Copy reply</button>
+      <button id="reset" class="secondary" type="button">Clear answers</button>
+      <span id="status"></span>
+    </div>
+  </section>
+</main>
+<script id="data" type="application/json">/*DATA*/</script>
+<script>
+(() => {
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const storeKey = 'issue-triage:' + data.file;
+  const VERDICT_NAMES = { ready: 'Ready for an agent', decide: 'Needs a decision', split: 'Split', close: 'Close', priority: 'Reprioritise', keep: 'Leave as is' };
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v; else n.setAttribute(k, v);
+    }
+    for (const kid of kids) if (kid) n.append(kid);
+    return n;
+  };
+  const ref = (item) => (item.kind === 'pr' ? 'PR #' : '#') + item.number;
+
+  document.getElementById('title').textContent = data.title || 'Issue triage';
+  document.getElementById('meta').textContent = `${data.repo} · ${data.generated}`;
+  document.title = data.title || 'Issue triage';
+  if (data.intro) { const p = document.getElementById('intro'); p.textContent = data.intro; p.hidden = false; }
+
+  const root = document.getElementById('items');
+  const entries = [];   // every action and question, in page order
+  const boxes = [];
+  const itemNotes = [];
+
+  const choiceGroup = (name, q, onPick) => {
+    const style = q.style || (q.options.length <= 4 && q.options.every((o) => o.label.length <= 60) ? 'cards' : 'radio');
+    const group = el('div', { class: style === 'cards' ? 'cards' : 'radios', role: 'radiogroup' });
+    for (const o of q.options) {
+      const input = el('input', { type: 'radio', name, value: o.label });
+      if (q.default === o.label) input.dataset.default = '1';
+      const label = el('span', { class: 'label', text: o.label });
+      if (o.recommended) label.append(el('span', { class: 'rec', text: 'recommended' }));
+      const body = el('span', {}, label, o.detail ? el('span', { class: 'detail', text: o.detail }) : null);
+      group.append(el('label', { class: style === 'cards' ? 'card' : '' }, input, body));
+      if (onPick) input.addEventListener('change', onPick);
+    }
+    return group;
+  };
+  const stepList = (steps) => {
+    const ol = el('ol', { class: 'steps' });
+    for (const s of steps || []) {
+      const li = el('li', {}, s.where ? el('div', { class: 'where', text: s.where }) : null, el('div', { text: s.text || '' }));
+      if (s.cmd) li.append(el('pre', { text: s.cmd }));
+      ol.append(li);
+    }
+    return ol;
+  };
+
+  for (const item of data.items) {
+    const box = el('section', { class: 'item' });
+    box.dataset.verdict = item.verdict;
+    const link = el('a', { href: item.url, target: '_blank', rel: 'noopener', text: `${ref(item)} ${item.title}` });
+    box.append(el('h2', {}, link));
+    const tags = el('div');
+    tags.append(el('span', { class: `tag verdict v-${item.verdict}`, text: VERDICT_NAMES[item.verdict] }));
+    if (item.kind === 'pr') tags.append(el('span', { class: 'tag', text: 'pull request' }));
+    for (const label of item.labels || []) tags.append(el('span', { class: 'tag', text: label }));
+    box.append(tags);
+    if (item.summary) box.append(el('p', { class: 'summary', text: item.summary }));
+    if (item.why) box.append(el('p', { class: 'why', text: item.why }));
+
+    if ((item.actions || []).length) box.append(el('div', { class: 'section-head', text: 'Proposed changes' }));
+    (item.actions || []).forEach((a, i) => {
+      const key = `${ref(item)} A${i + 1}`;
+      const name = `a-${item.kind}-${item.number}-${i}`;
+      const row = el('div', { class: 'action' });
+      const head = el('div', {}, el('span', { class: 'a-title', text: a.title }));
+      if (a.recommended) head.append(el('span', { class: 'rec', text: 'recommended' }));
+      const yes = el('input', { type: 'radio', name, value: 'accept' });
+      const no = el('input', { type: 'radio', name, value: 'reject' });
+      const seg = el('div', { class: 'seg', role: 'radiogroup', 'aria-label': a.title },
+        el('label', {}, yes, document.createTextNode('Accept')),
+        el('label', { class: 'no' }, no, document.createTextNode('Reject')));
+      row.append(head, seg);
+      if (a.detail) row.append(el('div', { class: 'detail', text: a.detail }));
+      if (a.preview) row.append(el('details', {}, el('summary', { text: 'Show the text' }), el('pre', { text: a.preview })));
+      box.append(row);
+      entries.push({ type: 'action', key, name, a, item, row });
+    });
+
+    if ((item.questions || []).length) box.append(el('div', { class: 'section-head', text: 'Questions for you' }));
+    (item.questions || []).forEach((q, i) => {
+      const key = `${ref(item)} Q${i + 1}`;
+      const name = `q-${item.kind}-${item.number}-${i}`;
+      const wrap = el('div', { class: 'q' });
+      const headText = el('div', { class: 'q-head', text: `Q${i + 1}. ${q.prompt}` });
+      if (q.default) headText.append(el('span', { class: 'fyi', text: `going with ${q.default} unless you object` }));
+      wrap.append(headText);
+      const context = q.context || q.why;
+      if (context) wrap.append(el('div', { class: 'q-context', text: context }));
+      const entry = { type: 'question', key, name, q, item, wrap };
+
+      if (q.kind === 'chore') {
+        if (q.stepsFor) {
+          const stepsBox = el('div');
+          const show = () => {
+            const picked = wrap.querySelector(`input[name="${name}"]:checked`);
+            stepsBox.replaceChildren(picked ? stepList(q.stepsFor[picked.value]) : el('div', { class: 'q-context', text: 'Pick one to see the steps.' }));
+          };
+          wrap.append(choiceGroup(name, q, show), stepsBox);
+          entry.showSteps = show;
+        } else {
+          wrap.append(stepList(q.steps));
+        }
+        entry.done = el('input', { type: 'checkbox', name: name + '-done' });
+      } else if (q.type === 'text') {
+        entry.text = el('textarea', { name, placeholder: q.placeholder || 'Your answer' });
+        wrap.append(entry.text);
+      } else {
+        wrap.append(choiceGroup(name, q));
+      }
+      if (!entry.text) {
+        entry.note = el('input', { type: 'text', class: 'note', name: name + '-note', placeholder: 'Note or another answer (optional)' });
+        wrap.append(entry.note);
+      }
+      entry.skip = el('input', { type: 'checkbox', name: name + '-skip' });
+      const checks = el('div', { class: 'checks' });
+      if (entry.done) checks.append(el('label', { class: 'check' }, entry.done, document.createTextNode('I did this')));
+      checks.append(el('label', { class: 'check' }, entry.skip, document.createTextNode('Skip for now')));
+      wrap.append(checks);
+      entries.push(entry);
+      box.append(wrap);
+    });
+
+    const note = el('textarea', { class: 'note', name: `n-${item.kind}-${item.number}`, placeholder: `Notes on ${ref(item)} for the agent (optional)` });
+    box.append(el('div', { class: 'section-head', text: 'Your notes' }), note);
+    itemNotes.push({ item, note });
+    root.append(box);
+    boxes.push(box);
+  }
+
+  // Filter chips, one per verdict on the page.
+  const filters = document.getElementById('filters');
+  const spacer = filters.querySelector('.spacer');
+  const counts = {};
+  for (const item of data.items) counts[item.verdict] = (counts[item.verdict] || 0) + 1;
+  let active = 'all';
+  const chips = [];
+  const addChip = (value, text) => {
+    const chip = el('button', { type: 'button', class: 'chip', 'aria-pressed': String(value === active), text });
+    chip.addEventListener('click', () => {
+      active = value;
+      for (const c of chips) c.setAttribute('aria-pressed', String(c === chip));
+      for (const b of boxes) b.hidden = active !== 'all' && b.dataset.verdict !== active;
+    });
+    chips.push(chip);
+    filters.insertBefore(chip, spacer);
+  };
+  addChip('all', `All ${data.items.length}`);
+  for (const v of Object.keys(VERDICT_NAMES)) if (counts[v]) addChip(v, `${VERDICT_NAMES[v]} ${counts[v]}`);
+
+  const answerOf = (e) => {
+    if (e.type === 'action') {
+      const picked = e.row.querySelector(`input[name="${e.name}"]:checked`);
+      return picked ? { state: 'done', value: picked.value } : { state: 'open' };
+    }
+    if (e.skip.checked) return { state: 'skip' };
+    const note = e.note ? e.note.value.trim() : '';
+    if (e.text) {
+      const v = e.text.value.trim();
+      return v ? { state: 'done', value: v } : { state: 'open' };
+    }
+    const picked = e.wrap.querySelector(`input[name="${e.name}"]:checked`);
+    if (e.done) {
+      const parts = [picked && picked.value, e.done.checked ? 'done' : null].filter(Boolean);
+      if (!parts.length && !note) return { state: 'open' };
+      return { state: 'done', value: parts.join(', ') || 'Other', note };
+    }
+    if (!picked && !note) return { state: 'open' };
+    return { state: 'done', value: picked ? picked.value : 'Other', note };
+  };
+
+  const indent = (s) => s.replace(/\n/g, '\n  ');
+  const render = () => {
+    const lines = [`/issue-triage apply ${data.file}`, ''];
+    let done = 0;
+    const open = [];
+    let last = null;
+    for (const e of entries) {
+      if (e.row) e.row.classList.toggle('accepted', !!e.row.querySelector('input[value="accept"]:checked'));
+      if (e.row) e.row.classList.toggle('rejected', !!e.row.querySelector('input[value="reject"]:checked'));
+      if (last && last !== e.item) {
+        const n = itemNotes.find((x) => x.item === last).note.value.trim();
+        if (n) lines.push(`${ref(last)} note: ${indent(n)}`);
+      }
+      last = e.item;
+      const a = answerOf(e);
+      if (a.state === 'done') done++;
+      if (a.state === 'open') { open.push(e.key); continue; }
+      if (a.state === 'skip') { lines.push(`${e.key}: skip`); continue; }
+      if (e.type === 'action') { lines.push(`${e.key} ${a.value}: ${e.a.title}`); continue; }
+      lines.push(`${e.key}: ${indent(a.value)}`);
+      if (a.note) lines.push(`${e.key} note: ${indent(a.note)}`);
+    }
+    if (last) {
+      const n = itemNotes.find((x) => x.item === last).note.value.trim();
+      if (n) lines.push(`${ref(last)} note: ${indent(n)}`);
+    }
+    const overall = document.getElementById('overall').value.trim();
+    if (overall) lines.push('', `Overall note: ${indent(overall)}`);
+    if (open.length) lines.push('', `Undecided: ${open.join(', ')}`);
+    document.getElementById('reply').textContent = lines.join('\n');
+    document.getElementById('count').textContent = `${done} of ${entries.length} decided`;
+    document.getElementById('fill').style.width = `${entries.length ? (100 * done) / entries.length : 0}%`;
+    const status = document.getElementById('status');
+    status.className = open.length ? 'missing' : '';
+    status.textContent = open.length ? `${open.length} undecided` : '';
+  };
+
+  const fields = () => document.querySelectorAll('#items input, #items textarea, #overall');
+  const save = () => {
+    const state = {};
+    for (const n of fields()) {
+      if (n.type === 'radio') { if (n.checked) state[n.name] = n.value; }
+      else if (n.type === 'checkbox') state[n.name] = n.checked;
+      else state[n.name || n.id] = n.value;
+    }
+    try { localStorage.setItem(storeKey, JSON.stringify(state)); } catch {}
+  };
+  const applyDefaults = () => {
+    for (const n of root.querySelectorAll('input[data-default]')) n.checked = true;
+  };
+  const load = () => {
+    let state = null;
+    try { state = JSON.parse(localStorage.getItem(storeKey) || 'null'); } catch {}
+    if (!state) { applyDefaults(); return; }
+    for (const n of fields()) {
+      const k = n.name || n.id;
+      if (!(k in state)) continue;
+      if (n.type === 'radio') n.checked = state[k] === n.value;
+      else if (n.type === 'checkbox') n.checked = !!state[k];
+      else n.value = state[k];
+    }
+  };
+  const refreshSteps = () => { for (const e of entries) if (e.showSteps) e.showSteps(); };
+
+  const onChange = () => { render(); save(); };
+  root.addEventListener('input', onChange);
+  root.addEventListener('change', onChange);
+  document.getElementById('overall').addEventListener('input', onChange);
+  document.getElementById('accept-rec').addEventListener('click', () => {
+    for (const e of entries) {
+      if (e.type !== 'action' || !e.a.recommended) continue;
+      if (e.row.querySelector(`input[name="${e.name}"]:checked`)) continue;
+      e.row.querySelector('input[value="accept"]').checked = true;
+    }
+    onChange();
+  });
+  document.getElementById('copy').addEventListener('click', async () => {
+    const text = document.getElementById('reply').textContent;
+    const status = document.getElementById('status');
+    try { await navigator.clipboard.writeText(text); }
+    catch {
+      const range = document.createRange();
+      range.selectNodeContents(document.getElementById('reply'));
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      document.execCommand('copy');
+    }
+    status.className = 'copied';
+    status.textContent = 'Copied';
+  });
+  document.getElementById('reset').addEventListener('click', () => {
+    if (!confirm('Clear every answer on this page?')) return;
+    try { localStorage.removeItem(storeKey); } catch {}
+    for (const n of fields()) {
+      if (n.type === 'radio' || n.type === 'checkbox') n.checked = false; else n.value = '';
+    }
+    applyDefaults();
+    refreshSteps();
+    render();
+  });
+  load();
+  refreshSteps();
+  render();
+})();
+</script>
+</body>
+</html>
