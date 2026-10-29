@@ -15,7 +15,8 @@ This repository collects skills for use by multiple agents: skills imported from
 
 - Store them the same way, at `skills/<name>/SKILL.md`, with no `metadata.source`.
 - Keep them generic. No project names, private repo details, people's names, issue numbers or machine-specific paths. Read project specifics from the project's own agent instructions at run time; `skills/start-work/project-rules.md` lists what to look up.
-- A skill adapted from licensed work keeps that work's license notice in its own directory, so each skill can be copied on its own.
+- Each authored skill carries the MIT license as `LICENSE` in its own directory (copy it from an existing authored skill), so each skill can be copied on its own.
+- A skill adapted from licensed work also keeps that work's license notice in its own directory, such as `TSTACK-LICENSE`.
 - Link to other skills by relative path (`../<name>/SKILL.md`), and keep every link pointing at a file in this repo.
 - Update the README's skill table when adding or removing a skill.
 

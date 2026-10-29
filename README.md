@@ -70,4 +70,6 @@ If the skill already has `metadata`, add these keys to that mapping. Update the 
 
 Imported skills retain their upstream licenses. Unslop is distributed under the MIT license, with the original notice in [skills/unslop/LICENSE](skills/unslop/LICENSE).
 
-full-send, half-send, file-pr, leaving-pr-comments and start-work's review flow are adapted from tstack, distributed under the MIT license. Each of those skill directories carries the original notice as `TSTACK-LICENSE`.
+Authored skills are distributed under the MIT license, with the notice in each skill's own `LICENSE` file, so a skill copied on its own keeps it.
+
+full-send, half-send, file-pr, leaving-pr-comments and start-work's review flow are adapted from tstack, distributed under the MIT license. Each of those skill directories also carries the original notice as `TSTACK-LICENSE`.
